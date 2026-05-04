@@ -1,0 +1,75 @@
+name: Gemini Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  gemini-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get code diff
+        run: |
+          git fetch origin main
+          git diff origin/main...HEAD > diff.txt
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Run Gemini Review
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python <<EOF
+          import os, requests
+
+          with open("diff.txt", "r", encoding="utf-8", errors="ignore") as f:
+              diff = f.read()
+
+          if not diff.strip():
+              print("No code changes detected.")
+              exit(0)
+
+          prompt = f"""
+          You are a senior backend engineer.
+
+          Review the following Git diff and identify:
+          1. Bugs
+          2. Security issues
+          3. Bad practices
+          4. Breaking changes
+
+          Respond clearly and concisely.
+
+          CODE DIFF:
+          {diff}
+          """
+
+          response = requests.post(
+              "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+              params={"key": os.environ["GEMINI_API_KEY"]},
+              json={
+                  "contents": [
+                      {
+                          "parts": [
+                              {"text": prompt}
+                          ]
+                      }
+                  ]
+              }
+          )
+
+          result = response.json()
+          print("Gemini Review Result:")
+          print(result)
+          EOF
