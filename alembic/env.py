@@ -1,6 +1,15 @@
 # alembic/env.py
 # This file configures HOW Alembic connects to the database and detects changes.
 
+# ── CRITICAL: Add project root to Python path FIRST ─────────────────────────
+
+import sys
+from pathlib import Path
+
+# Add project root to Python path BEFORE any app imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 # ── Imports ───────────────────────────────────────────────────────────────────
 
 import asyncio
@@ -28,9 +37,8 @@ from app.db.base import Base
 # Alembic compares Base.metadata against the live DB to detect what changed.
 
 # Import every model so SQLAlchemy registers them in Base.metadata:
-# (These imports are added as each model file is created)
-# from app.models.user import User
-# from app.models.company import Company, CompanyMember
+from app.models.user import User
+from app.models.company import Company, CompanyMember
 # from app.models.folder import Folder
 # from app.models.document import Document
 # from app.models.document_chunk import DocumentChunk
@@ -38,6 +46,7 @@ from app.db.base import Base
 
 from app.core.config import settings
 # Import settings to get the database URL from .env
+
 
 
 # ── Alembic Config ────────────────────────────────────────────────────────────
