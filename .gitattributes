@@ -1,0 +1,6 @@
+# Force consistent line endings across OS
+* text=auto eol=lf
+
+# Windows scripts (if any)
+*.bat eol=crlf
+*.ps1 eol=crlf

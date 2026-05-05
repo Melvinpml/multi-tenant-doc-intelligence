@@ -30,7 +30,7 @@ from app.db.session import engine
 # The async SQLAlchemy engine — used during startup to verify DB connectivity.
 
 # ── Router Imports (added as each feature branch is merged) ───────────────────
-# from app.api.v1.auth import router as auth_router
+from app.api.v1.auth import router as auth_router
 # from app.api.v1.companies import router as companies_router
 # from app.api.v1.folders import router as folders_router
 # from app.api.v1.documents import router as documents_router
@@ -148,7 +148,7 @@ def create_application() -> FastAPI:
     # Each router is added here as its feature branch is merged.
     # Uncomment each line when the corresponding feature branch is ready:
 
-    # application.include_router(auth_router)
+    application.include_router(auth_router)
     # application.include_router(companies_router)
     # application.include_router(folders_router)
     # application.include_router(documents_router)
