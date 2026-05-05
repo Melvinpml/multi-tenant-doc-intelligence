@@ -14,8 +14,9 @@ from app.core.security import (
 )
 from app.models.user import User
 from app.models.company import Company, CompanyMember, RoleEnum
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserMeResponse
+from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserMeResponse, RegisterUserOnlyRequest, UserOnlyResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 bearer_scheme = HTTPBearer()
@@ -52,6 +53,40 @@ async def register(payload: RegisterRequest, db: Annotated[AsyncSession, Depends
         role=RoleEnum.owner.value,
     )
     return TokenResponse(access_token=token)
+
+
+@router.post("/register-user", response_model=UserOnlyResponse, status_code=status.HTTP_201_CREATED)
+async def register_user_only(
+    payload: RegisterUserOnlyRequest,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Register a user WITHOUT creating a company.
+    
+    Use this endpoint to:
+    - Create team members before inviting them to an existing company
+    - Register users who will be invited later via the multi-tenancy flow
+    """
+    result = await db.execute(select(User).where(User.email == payload.email))
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered."
+        )
+    
+    user = User(
+        email=payload.email,
+        hashed_password=hash_password(payload.password),
+        is_active=True
+    )
+    db.add(user)
+    await db.flush()
+    
+    return UserOnlyResponse(
+        id=user.id,
+        email=user.email,
+        message="User created successfully. They can now be invited to a company."
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
