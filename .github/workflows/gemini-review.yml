@@ -14,8 +14,8 @@ jobs:
 
       - name: Get code diff
         run: |
-          git fetch origin main
-          git diff origin/main...HEAD > diff.txt
+          git fetch origin development
+          git diff origin/development...HEAD > diff.txt
 
       - name: Install Python
         uses: actions/setup-python@v5
