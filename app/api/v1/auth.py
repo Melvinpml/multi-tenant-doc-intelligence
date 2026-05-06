@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Annotated
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request # NEW: Added Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -17,13 +17,19 @@ from app.models.company import Company, CompanyMember, RoleEnum
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserMeResponse, RegisterUserOnlyRequest, UserOnlyResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+# NEW: Imported Audit services
+from app.services.audit_service import log_action, get_client_ip, AuditAction
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 bearer_scheme = HTTPBearer()
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+async def register(
+    payload: RegisterRequest, 
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request # NEW: Added request to get IP
+):
     result = await db.execute(select(User).where(User.email == payload.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered.")
@@ -46,6 +52,16 @@ async def register(payload: RegisterRequest, db: Annotated[AsyncSession, Depends
     )
     db.add(membership)
     await db.flush()
+
+    # NEW: Log the registration event
+    await log_action(
+        db=db,
+        action=AuditAction.REGISTER,
+        company_id=company.id,
+        user_id=user.id,
+        ip_address=get_client_ip(request),
+        details={"email": payload.email, "company": payload.company_name},
+    )
 
     token = create_access_token(
         subject=str(user.id),
@@ -90,7 +106,11 @@ async def register_user_only(
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(payload: LoginRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+async def login(
+    payload: LoginRequest, 
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request # NEW: Added request to get IP
+):
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
@@ -111,6 +131,17 @@ async def login(payload: LoginRequest, db: Annotated[AsyncSession, Depends(get_d
         raise HTTPException(status_code=400, detail="User has no company membership.")
 
     primary = memberships[0]
+
+    # NEW: Log the successful login event
+    await log_action(
+        db=db,
+        action=AuditAction.LOGIN,
+        company_id=primary.company_id,
+        user_id=user.id,
+        ip_address=get_client_ip(request),
+        details={"email": payload.email},
+    )
+
     token = create_access_token(
         subject=str(user.id),
         company_id=str(primary.company_id),
@@ -123,19 +154,33 @@ async def login(payload: LoginRequest, db: Annotated[AsyncSession, Depends(get_d
 async def logout(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     redis: Annotated[aioredis.Redis, Depends(get_redis)],
+    db: Annotated[AsyncSession, Depends(get_db)], # NEW: Added DB session dependency
+    request: Request # NEW: Added request to get IP
 ):
     token = credentials.credentials
     try:
         payload = decode_access_token(token)
         jti = payload.get("jti")
         exp = payload.get("exp")
+        
         if jti and exp:
             import time
             ttl = int(exp - time.time())
             if ttl > 0:
                 await redis.setex(f"blocklist:{jti}", ttl, "revoked")
+
+        # NEW: Log the logout event
+        await log_action(
+            db=db,
+            action=AuditAction.LOGOUT,
+            company_id=uuid.UUID(payload.get("company_id")),
+            user_id=uuid.UUID(payload.get("sub")),
+            ip_address=get_client_ip(request),
+        )
     except Exception:
+        # If token is totally invalid, we just pass and return logged out anyway
         pass
+    
     return {"message": "Successfully logged out."}
 
 

@@ -42,7 +42,7 @@ from app.models.company import Company, CompanyMember
 from app.models.folder import Folder
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
-# from app.models.audit_log import AuditLog
+from app.models.audit_log import AuditLog
 
 from app.core.config import settings
 # Import settings to get the database URL from .env
