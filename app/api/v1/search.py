@@ -12,6 +12,9 @@ from app.models.user import User
 from app.schemas.search import SearchResponse, SearchResultItem
 from app.services.search_service import keyword_search, semantic_search
 
+# NEW: Imported Audit services
+from app.services.audit_service import log_action, get_client_ip, AuditAction
+
 router = APIRouter(prefix="/api/v1/search", tags=["Search"])
 
 
@@ -26,6 +29,7 @@ class SearchMode(str, Enum):
     dependencies=[Depends(RateLimiter(times=60, seconds=60))],
 )
 async def search_documents(
+    request: Request, # NEW: Added request to capture IP for audit logs
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     tenant_id: Annotated[uuid.UUID, Depends(get_tenant_context)],
@@ -87,6 +91,20 @@ async def search_documents(
         )
         for r in results
     ]
+
+    # NEW: Log the search event
+    await log_action(
+        db=db,
+        action=AuditAction.SEARCH,
+        company_id=tenant_id,
+        user_id=current_user.id,
+        ip_address=get_client_ip(request),
+        details={
+            "query": q,
+            "mode": mode.value,
+            "results_count": len(items),
+        },
+    )
 
     return SearchResponse(
         query=q,

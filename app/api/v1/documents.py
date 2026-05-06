@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile, status, Request # NEW: Added Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -19,6 +19,10 @@ from app.services.document_service import (
 )
 from app.worker.tasks import process_document
 
+# NEW: Imported Audit services
+from app.services.audit_service import log_action, get_client_ip, AuditAction
+
+
 router = APIRouter(prefix="/api/v1/documents", tags=["Documents"])
 
 
@@ -32,6 +36,7 @@ async def upload_document(
     current_user: Annotated[User, Depends(get_current_user)],
     tenant_id: Annotated[uuid.UUID, Depends(get_tenant_context)],
     _: Annotated[bool, Depends(require_role(RoleEnum.member))],
+    request: Request, # NEW: Added request to capture IP
     file: UploadFile = File(...),
     folder_id: Optional[uuid.UUID] = Form(None),
 ):
@@ -53,6 +58,21 @@ async def upload_document(
     await db.flush()
 
     process_document.delay(str(doc.id), str(tenant_id), file_path)
+
+    # NEW: Log the document upload event
+    await log_action(
+        db=db,
+        action=AuditAction.DOC_UPLOAD,
+        company_id=tenant_id,
+        user_id=current_user.id,
+        ip_address=get_client_ip(request),
+        details={
+            "document_id": str(doc.id),
+            "filename": safe_name,
+            "file_type": file_type,
+            "file_size": file_size,
+        },
+    )
 
     return DocumentUploadResponse(
         id=doc.id,
@@ -110,6 +130,7 @@ async def move_document_endpoint(
     current_user: Annotated[User, Depends(get_current_user)],
     tenant_id: Annotated[uuid.UUID, Depends(get_tenant_context)],
     _: Annotated[bool, Depends(require_role(RoleEnum.member))],
+    request: Request, # NEW: Added request to capture IP
 ):
     doc = await move_document(
         document_id=document_id,
@@ -117,6 +138,20 @@ async def move_document_endpoint(
         tenant_id=tenant_id,
         db=db,
     )
+
+    # NEW: Log the document move event
+    await log_action(
+        db=db,
+        action=AuditAction.DOC_MOVE,
+        company_id=tenant_id,
+        user_id=current_user.id,
+        ip_address=get_client_ip(request),
+        details={
+            "document_id": str(document_id),
+            "target_folder_id": str(payload.folder_id),
+        },
+    )
+
     return doc
 
 
@@ -127,5 +162,16 @@ async def delete_document_endpoint(
     current_user: Annotated[User, Depends(get_current_user)],
     tenant_id: Annotated[uuid.UUID, Depends(get_tenant_context)],
     _: Annotated[bool, Depends(require_role(RoleEnum.member))],
+    request: Request, # NEW: Added request to capture IP
 ):
     await soft_delete_document(document_id=document_id, tenant_id=tenant_id, db=db)
+
+    # NEW: Log the document delete event
+    await log_action(
+        db=db,
+        action=AuditAction.DOC_DELETE,
+        company_id=tenant_id,
+        user_id=current_user.id,
+        ip_address=get_client_ip(request),
+        details={"document_id": str(document_id)},
+    )
