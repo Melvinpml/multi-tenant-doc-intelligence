@@ -29,6 +29,7 @@ class DocumentUploadResponse(BaseModel):
 class DocumentMoveRequest(BaseModel):
     folder_id: Optional[uuid.UUID] = None
 
+
 class DocumentListResponse(BaseModel):
     total: int
     items: list[DocumentResponse]

@@ -34,7 +34,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.companies import router as companies_router
 from app.api.v1.folders import router as folders_router
 from app.api.v1.documents import router as documents_router
-# from app.api.v1.search import router as search_router
+from app.api.v1.search import router as search_router
 # from app.api.v1.audit import router as audit_router
 # NOTE: These are commented out now — they will be uncommented as each
 #       feature branch is merged into development.
@@ -152,7 +152,7 @@ def create_application() -> FastAPI:
     application.include_router(companies_router)
     application.include_router(folders_router)
     application.include_router(documents_router)
-    # application.include_router(search_router)
+    application.include_router(search_router)
     # application.include_router(audit_router)
 
     # ── Health Check ─────────────────────────────────────────────────────────

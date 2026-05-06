@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     # REQUIRED. API key for Gemini (or another AI provider).
     # Used by Celery worker to generate text embeddings.
 
-    AI_EMBEDDING_MODEL: str = "models/embedding-001"
+    AI_EMBEDDING_MODEL: str = "models/gemini-embedding-001"
     # Which embedding model to call on the AI provider.
 
     AI_EMBEDDING_DIMENSION: int = 768
