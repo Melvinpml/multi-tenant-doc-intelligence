@@ -1,9 +1,15 @@
 import uuid
 import enum
+from typing import TYPE_CHECKING
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, ForeignKey, UniqueConstraint, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from app.db.base import Base, UUIDPrimaryKeyMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.folder import Folder
+    # from app.models.document import Document
+    from app.models.user import User
 
 
 class RoleEnum(str, enum.Enum):
@@ -21,6 +27,12 @@ class Company(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     members: Mapped[list["CompanyMember"]] = relationship(
         "CompanyMember", back_populates="company", lazy="selectin"
     )
+    folders: Mapped[list["Folder"]] = relationship(
+        "Folder", back_populates="company", lazy="noload"
+    )
+    documents: Mapped[list["Document"]] = relationship(
+        "Document", back_populates="company", lazy="noload"
+    )
 
 
 class CompanyMember(Base, TimestampMixin):
@@ -30,12 +42,14 @@ class CompanyMember(Base, TimestampMixin):
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
-        primary_key=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     company_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"),
-        primary_key=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     role: Mapped[RoleEnum] = mapped_column(
         SAEnum(RoleEnum, name="roleenum"), nullable=False
