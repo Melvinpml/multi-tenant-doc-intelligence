@@ -39,9 +39,9 @@ from app.db.base import Base
 # Import every model so SQLAlchemy registers them in Base.metadata:
 from app.models.user import User
 from app.models.company import Company, CompanyMember
-# from app.models.folder import Folder
-# from app.models.document import Document
-# from app.models.document_chunk import DocumentChunk
+from app.models.folder import Folder
+from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
 # from app.models.audit_log import AuditLog
 
 from app.core.config import settings
